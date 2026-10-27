@@ -18,7 +18,7 @@ El sistema busca regular la potencia entregada a una carga de corriente alterna 
 ## Organización
 
 - `docs/`: arquitectura, documentación de módulos, decisiones y registro de avances.
-- `docs/ai/`: política y registro resumido de aportes importantes de IA.
+- `docs/ai/`: registro resumido de los aportes importantes de inteligencia artificial.
 - `rtl/`: código Verilog del sistema y sus módulos.
 - `sim/`: bancos de prueba y simulaciones.
 - `constraints/`: restricciones de implementación de la FPGA.
