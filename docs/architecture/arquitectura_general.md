@@ -128,7 +128,7 @@ Las siguientes señales representan las interfaces funcionales previstas entre l
 
 | Señal | Origen → destino | Anchura prevista | Función |
 |---|---|---|---|
-| `pot_sample` | M1 → M3 | 12 bits, provisional | Muestra digital del potenciómetro. |
+| `pot_sample` | M1 → M3 | 12 bits, confirmado | Muestra digital del potenciómetro, obtenida de `DO[15:4]` mediante la interfaz DRP del XADC. |
 | `sample_valid` | M1 → M3 | 1 bit | Indica que hay una muestra disponible. |
 | `delay_target` | M3 → M5 | 20 bits, provisional | Número objetivo de ciclos para la temporización. |
 | `zc_in` | Detector externo → M2 | 1 bit | Señal digital asíncrona de cruce por cero. |
@@ -150,7 +150,7 @@ La arquitectura está definida a nivel conceptual, pero los siguientes puntos de
 
 | Tema | Aspecto pendiente |
 |---|---|
-| XADC | Confirmar canal, pin, rango de tensión, configuración de la IP, bits útiles y protocolo de lectura. |
+| XADC | Canal VAUX3, interfaz DRP, dirección `7'h13` y extracción de 12 bits desde `DO[15:4]` identificados en la configuración de Vivado. Quedan pendientes la implementación RTL, la simulación y la validación física. |
 | Detector de cruce por cero | Definir el circuito externo, los niveles lógicos, la forma de onda, la polaridad y el aislamiento. |
 | Detección del evento | Determinar qué flancos se detectarán y si es necesario rechazar transiciones espurias. |
 | Mapeo del potenciómetro | Definir los límites de `delay_target`, su resolución y el tratamiento de muestras inválidas. |
@@ -171,3 +171,4 @@ Un punto pendiente solo se considerará definido cuando exista una justificació
 La FPGA debe permanecer eléctricamente separada de la etapa de potencia mediante una interfaz de aislamiento adecuada. La señal digital `gate_pulse` no proporciona aislamiento por sí misma.
 
 El montaje y las pruebas de la etapa conectada a la red de corriente alterna deben realizarse con las protecciones adecuadas y bajo supervisión cualificada.
+
