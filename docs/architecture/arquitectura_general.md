@@ -97,7 +97,7 @@ La arquitectura define ocho módulos funcionales y un módulo superior de integr
 
 | Identificador | Módulo | Responsabilidad principal |
 |---|---|---|
-| M1 | `xadc_interface` | Obtener muestras digitales del potenciómetro mediante la interfaz del XADC. |
+| M1 | `xadc_interface` | Obtener muestras digitales del potenciómetro mediante la interfaz DRP del XADC; su FSM tiene cuatro estados definidos (`IDLE`, `REQ`, `WAIT`, `REARM`), codificación, transiciones y señales de control establecidas como referencia para el RTL. Su implementación y validación siguen pendientes. |
 | M2 | `zero_cross_sync` | Sincronizar la señal externa de cruce por cero con el reloj de la FPGA. |
 | M3 | `control_mapper` | Convertir la muestra del potenciómetro en el valor de retardo `delay_target`. |
 | M4 | `zero_cross_detect` | Detectar el evento de cruce por cero y generar `zc_event`. |
@@ -150,7 +150,7 @@ La arquitectura está definida a nivel conceptual, pero los siguientes puntos de
 
 | Tema | Aspecto pendiente |
 |---|---|
-| XADC | Canal VAUX3, interfaz DRP, dirección `7'h13` y extracción de 12 bits desde `DO[15:4]` identificados en la configuración de Vivado. Quedan pendientes la implementación RTL, la simulación y la validación física. |
+| XADC | Canal VAUX3, interfaz DRP, dirección `7'h13` y extracción de 12 bits desde `DO[15:4]` identificados en la configuración de Vivado. La FSM de M1 tiene cuatro estados, codificación, transiciones y señales de control definidas y aprobadas como referencia RTL; quedan pendientes la implementación, simulación y validación física. |
 | Detector de cruce por cero | Definir el circuito externo, los niveles lógicos, la forma de onda, la polaridad y el aislamiento. |
 | Detección del evento | Determinar qué flancos se detectarán y si es necesario rechazar transiciones espurias. |
 | Mapeo del potenciómetro | Definir los límites de `delay_target`, su resolución y el tratamiento de muestras inválidas. |
