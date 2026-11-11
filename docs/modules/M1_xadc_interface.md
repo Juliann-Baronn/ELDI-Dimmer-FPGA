@@ -2,8 +2,8 @@
 # M1 — XADC Interface
 
 **Proyecto:** ELDI-Dimmer-FPGA  
-**Fecha del avance:** 3 de noviembre de 2026  
-**Estado:** Diseño revisado; preparación para implementación RTL.  
+**Fecha del avance:** 10 de noviembre de 2026
+**Estado:** Control digital implementado y secuencia observada en simulación; adquisición analógica pendiente de validar.
 **Módulo:** `xadc_interface`  
 **Plataforma:** Digilent Nexys 4 DDR — Artix-7  
 **Herramienta:** Vivado 2026.1  
@@ -26,7 +26,31 @@ Durante esta etapa se revisó la configuración real del XADC Wizard generado en
 - La interfaz DRP utilizada para consultar los resultados de conversión.
 - Las señales de control y estado disponibles.
 
-**Importante:** todavía no se ha implementado `xadc_interface.v`, no se ha construido su testbench y no se ha realizado una simulación funcional de M1.
+El avance del 10 de noviembre incorpora la implementación del control digital de M1 y una simulación compartida. La secuencia de la FSM y algunas señales de control se observaron, pero el resultado no demuestra que el XADC esté realizando conversiones analógicas útiles. No se ha completado la verificación del protocolo DRP ni la validación física.
+
+## 2.1. Configuración del XADC observada
+
+| Parámetro | Valor observado |
+|---|---|
+| IP | XADC Wizard 3.3, revisión 15 |
+| Canal | VAUXP3/VAUXN3 (VAUX3) |
+| Modo | Continuous, Single Channel |
+| Interfaz | DRP habilitada |
+| DCLK | 100 MHz |
+| Divisor de reloj | 4 |
+| Frecuencia ADC calculada | 25 MHz |
+| Tasa de conversión solicitada | 1000 KSPS |
+| Tasa mostrada | 961.54 KSPS |
+| Monitor de simulación | `design.txt` |
+| Estímulo revisado | `VAUXP[3]`: 0.50–0.51 V; `VAUXN[3]`: 0 V |
+
+La configuración y el estímulo se documentan como observados; aún debe confirmarse que `design.txt` aplica efectivamente la entrada al modelo XADC. No se modificaron los archivos HDL generados por Vivado.
+
+## 2.2. Implementación digital y testbench compartidos
+
+Se implementó la FSM de cuatro estados con lógica combinacional de siguiente estado y registro secuencial de estado con reset síncrono activo alto. El temporizador de 17 bits cuenta de 0 a 99 999 y se habilita en `IDLE` cuando `DRDY` está bajo. El control DRP establece `DEN` activo durante `REQ`, `DWE = 0`, `DADDR = 7'h13` y `DI = 16'h0000`. También se escribió en el código compartido la instancia de XADC Wizard con sus conexiones DRP. La captura toma `DO[15:4]` en `pot_sample`, emite `sample_valid` durante un ciclo y conserva la última muestra válida.
+
+El testbench compartido usa un reloj de 100 MHz (semiperiodo de 5 ns), un reset inicial de 100 ns y mantiene `vauxp3` y `vauxn3` en cero. El estímulo analógico se proporciona mediante `design.txt`; la interacción de ese archivo con el modelo del IP todavía debe confirmarse.
 
 ## 3. Decisiones confirmadas
 
@@ -146,52 +170,67 @@ Se debe distinguir entre:
 
 La documentación UG480 identifica el reset del XADC como activo en alto y asíncrono. No se debe modificar el comportamiento interno de la IP generada por Vivado. Fuera del reset, `pot_sample` conserva la última muestra válida.
 
-## 9. Aspectos pendientes
+## 9. Resultados de simulación y limitaciones
 
-1. Confirmar en RTL la habilitación del temporizador durante la espera en `IDLE` con `drdy_out` bajo y la alineación con `rst`.
+### 9.1. Observado en simulación
+
+- Secuencia `IDLE → REQ → WAIT → REARM → IDLE`.
+- Pulso `DEN` durante `REQ`.
+- Activación de `capture_sample` cuando `WAIT` y `DRDY` coinciden.
+- Pulso `sample_valid` asociado a la captura.
+- `do_out[15:0]` observado en cero y `pot_sample[11:0]` observado en cero.
+- `busy_out`, `eoc_out` y `channel_out` observados en cero durante los intervalos mostrados.
+
+Estas observaciones confirman actividad de la secuencia digital en los intervalos revisados. La observación de la FSM no demuestra que la adquisición analógica esté funcionando correctamente.
+
+### 9.2. Pendiente de validar
+
+- Conversión analógica útil del XADC y obtención de un valor correcto y no nulo en `pot_sample`.
+- Aplicación efectiva del estímulo de `design.txt` al modelo XADC.
+- Actividad interna del XADC, ampliando la escala temporal de la simulación.
+- Verificación completa del protocolo DRP e integración con el IP real.
+
+## 10. Aspectos pendientes
+
+1. Completar la verificación de la habilitación del temporizador en `IDLE` con `drdy_out` bajo y su alineación con `rst`.
 2. Definir la secuencia de liberación del reset durante la integración.
 3. Confirmar la correspondencia definitiva de los puertos externos con M3.
-4. Implementar y revisar el RTL conforme a la FSM aprobada.
-5. Construir el testbench y ejecutar la simulación.
+4. Completar la revisión RTL conforme a la FSM aprobada.
+5. Ejecutar y ampliar las pruebas del testbench compartido según los casos pendientes.
 6. Validar el comportamiento con la IP XADC y el potenciómetro.
 
-## 10. Plan de verificación
+## 11. Plan de verificación
 
-### Etapa 1 — Revisión RTL
+Los 14 casos de esta lista siguen **pendientes de verificación**. Las observaciones visuales ya registradas en la sección 9.1 son evidencia de señales en los intervalos mostrados, pero no equivalen a aprobar estos casos.
 
-- Comprobar que `DEN` dura un ciclo.
-- Verificar `DWE = 0`.
-- Verificar `DADDR = 7'h13`.
-- Confirmar que la captura depende de `DRDY`.
-- Comprobar el rearme antes de una nueva solicitud.
+| N.º | Caso de verificación | Estado / nota |
+|---:|---|---|
+| 1 | Aplicar el reset inicial y comprobar el estado y las salidas de reset. | Pendiente de verificación. |
+| 2 | Comprobar cuándo ocurre el primer `DEN` respecto de los 100 000 ciclos habilitados del temporizador. | Pendiente; comprobar y documentar la convención de conteo y el flanco asociado. |
+| 3 | Verificar durante `REQ` `DADDR = 7'h13`, `DWE = 0` y `DI = 16'h0000`. | Pendiente de verificación. |
+| 4 | Probar latencias de `DRDY` de 1, 4 y 20 ciclos. | Pendiente; comprobar y documentar la convención de conteo y los flancos observados. |
+| 5 | Probar los datos límite `16'hFFF0`, `16'h0000` y `16'h8000`. | Pendiente; no se fija aquí un resultado de conversión esperado. |
+| 6 | Comprobar que los bits `DO[3:0]` no afectan `pot_sample`, manteniendo controlados los bits superiores. | Pendiente de verificación. |
+| 7 | Comprobar que `sample_valid` dura un ciclo y está alineado con la actualización de `pot_sample`. | Pendiente; existe una observación visual de un pulso asociado a la captura. |
+| 8 | Comprobar que se produce una sola solicitud `DEN` por lectura. | Pendiente de verificación. |
+| 9 | Mantener `DRDY` alto durante varios ciclos y comprobar el rearme conforme a la FSM aprobada. | Pendiente de verificación. |
+| 10 | Comprobar el comportamiento cuando `DRDY` está alto en `IDLE` al vencer el temporizador. | Pendiente de verificación conforme a la tabla de transiciones aprobada. |
+| 11 | Aplicar reset durante `WAIT` y comprobar el comportamiento definido para el reset síncrono activo alto. | Pendiente de verificación. |
+| 12 | Comprobar la ausencia de `DRDY`: la implementación actual permanece en `WAIT` mientras `DRDY` no se active. | Pendiente de verificación. Un timeout es una mejora propuesta, no una función implementada. |
+| 13 | Medir la periodicidad entre lecturas considerando los ciclos adicionales de `REQ`, `WAIT` y `REARM`. | Pendiente; comprobar y documentar la convención de conteo. |
+| 14 | Integrar con el IP XADC real y confirmar que `design.txt` aplica efectivamente el estímulo al modelo. | Pendiente de verificación. |
 
-### Etapa 2 — Registro de muestra
+### Cobertura de transiciones de la FSM
 
-- Confirmar la captura de los 12 bits correctos.
-- Confirmar la retención del último valor válido.
-- Confirmar que `sample_valid` dura un ciclo.
-- Comprobar el comportamiento durante reset.
+Todas las transiciones siguientes están pendientes de cobertura mediante simulación con comprobación automática. La observación visual anterior no equivale a cobertura completa.
 
-### Etapa 3 — Temporización
-
-- Comprobar el contador de 1 ms.
-- Verificar la secuencia de solicitudes y respuestas DRP.
-- Comprobar que no se generen solicitudes repetidas durante una transacción activa.
-
-### Etapa 4 — Simulación
-
-- Ejecutar el testbench.
-- Cubrir todas las transiciones de la tabla de la FSM, incluidos ticks ignorados fuera de `IDLE` y `drdy_out` sostenido durante `REARM`.
-- Probar diferentes respuestas de `DRDY`.
-- Comprobar reset y retención de datos.
-- Revisar las formas de onda.
-
-### Etapa 5 — Prueba física
-
-- Integrar la IP XADC generada por Vivado.
-- Programar la Nexys 4 DDR.
-- Variar el potenciómetro.
-- Comprobar que `pot_sample` cambia de acuerdo con la entrada analógica.
+- `IDLE → REQ`: `tick_1ms = 1` y `drdy_out = 0`.
+- `IDLE → IDLE`: cualquier otra combinación de entradas.
+- `REQ → WAIT`: transición incondicional.
+- `WAIT → WAIT`: `drdy_out = 0`.
+- `WAIT → REARM`: `drdy_out = 1`.
+- `REARM → REARM`: `drdy_out = 1`.
+- `REARM → IDLE`: `drdy_out = 0`.
 
 ## 11. Estado del módulo
 
@@ -203,14 +242,16 @@ La documentación UG480 identifica el reset del XADC como activo en alto y asín
 | Revisión del protocolo DRP | Completada |
 | Definición de retención de muestra | Confirmada |
 | Definición de `sample_valid` | Confirmada |
-| Diseño de FSM de cuatro estados, codificación, transiciones y controles | Aprobado como referencia RTL; no verificado funcionalmente |
-| Implementación RTL | Pendiente |
-| Testbench | Pendiente |
-| Simulación | Pendiente |
-| Prueba física | Pendiente |
+| Diseño de FSM de cuatro estados, codificación, transiciones y controles | Implementado conforme a la referencia aprobada; secuencia observada, verificación funcional completa pendiente |
+| Implementación del control digital RTL | Completada en el código compartido |
+| Instancia XADC y conexiones DRP en código compartido | Escritas; conversión analógica por validar |
+| Testbench compartido | Disponible; casos de verificación pendientes |
+| Observación de secuencia de control en simulación | Observada en los intervalos mostrados; no valida la adquisición analógica |
+| Verificación completa DRP y de datos | Pendiente |
+| Conversión analógica útil y prueba física | Pendientes |
 
 ## 12. Conclusión
 
-M1 cuenta con una base técnica revisada, el comportamiento de retención de muestras definido y el diseño de la FSM aprobado como referencia para el RTL. El diseño todavía no está implementado ni verificado funcionalmente. El siguiente paso es construir la implementación RTL en Verilog, sin modificar la IP generada por Vivado.
+M1 cuenta con el control digital implementado en el código compartido y la secuencia de control observada en simulación. La configuración del XADC y el estímulo de simulación están registrados, pero las salidas de datos observadas permanecieron en cero y la aplicación efectiva de `design.txt` al modelo aún debe confirmarse. La adquisición analógica, la verificación completa DRP y la prueba física siguen pendientes; por tanto, M1 no está completamente validado. No se modificaron los archivos HDL generados por Vivado.
 
 La integración con M3 se realizará después de verificar individualmente el funcionamiento de M1.
