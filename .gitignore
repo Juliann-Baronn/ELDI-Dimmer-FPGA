@@ -1,0 +1,33 @@
+# Productos generados por Vivado
+.Xil/
+*.cache/
+*.gen/
+*.runs/
+*.sim/
+*.ip_user_files/
+*.hw/
+
+# Productos de XSim y simulación
+xsim.dir/
+*.jou
+*.log
+*.str
+*.wdb
+*.vcd
+*.fst
+
+# Implementación, bitstreams y reportes generados
+*.bit
+*.bin
+*.dcp
+*.ltx
+*.rpt
+*.pb
+
+# Archivos temporales del editor y del sistema
+*.tmp
+*.bak
+*.swp
+*~
+.DS_Store
+Thumbs.db

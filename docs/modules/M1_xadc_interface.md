@@ -2,8 +2,9 @@
 # M1 — XADC Interface
 
 **Proyecto:** ELDI-Dimmer-FPGA  
-**Fecha del avance:** 10 de noviembre de 2026
-**Estado:** Control digital implementado y secuencia observada en simulación; adquisición analógica pendiente de validar.
+**Fecha del avance original:** 10 de noviembre de 2026
+**Actualización documental:** 18 de noviembre de 2026
+**Estado:** Control digital implementado; adquisición básica validada físicamente en una Nexys 4 DDR. La caracterización metrológica del XADC y la integración definitiva M1–M3 siguen pendientes.
 **Módulo:** `xadc_interface`  
 **Plataforma:** Digilent Nexys 4 DDR — Artix-7  
 **Herramienta:** Vivado 2026.1  
@@ -13,6 +14,8 @@
 El módulo `xadc_interface` (M1) proporciona la interfaz entre el XADC Wizard generado en Vivado y la lógica digital del sistema.
 
 Su función es obtener las muestras digitalizadas del potenciómetro y entregarlas al módulo M3 mediante las señales `pot_sample` y `sample_valid`.
+
+> **Nota de historial.** Las secciones que describen las observaciones de simulación del 10 de noviembre se conservan como evidencia histórica. La actualización del 18 de noviembre, incluida al final de este documento, registra una prueba física posterior que valida la adquisición básica, sin convertir las comprobaciones de simulación aún pendientes en casos aprobados.
 
 ## 2. Trabajo realizado
 
@@ -232,7 +235,9 @@ Todas las transiciones siguientes están pendientes de cobertura mediante simula
 - `REARM → REARM`: `drdy_out = 1`.
 - `REARM → IDLE`: `drdy_out = 0`.
 
-## 11. Estado del módulo
+## 12. Estado del módulo — estado histórico al 10 de noviembre de 2026
+
+> Esta tabla conserva el estado documentado el 10 de noviembre de 2026. En particular, sus afirmaciones de que la adquisición analógica útil y la prueba física estaban pendientes corresponden exclusivamente a esa fecha. El estado vigente se encuentra en la actualización del 18 de noviembre de 2026 (sección 14).
 
 | Actividad | Estado |
 |---|---|
@@ -250,8 +255,50 @@ Todas las transiciones siguientes están pendientes de cobertura mediante simula
 | Verificación completa DRP y de datos | Pendiente |
 | Conversión analógica útil y prueba física | Pendientes |
 
-## 12. Conclusión
+## 13. Conclusión histórica — 10 de noviembre de 2026
+
+> La conclusión siguiente se conserva como evidencia histórica del 10 de noviembre de 2026. La condición de adquisición analógica y prueba física pendientes que describe no es el estado vigente; la actualización del 18 de noviembre registra la validación física básica del potenciómetro en la Nexys 4 DDR, mientras la caracterización y la integración permanecen pendientes.
 
 M1 cuenta con el control digital implementado en el código compartido y la secuencia de control observada en simulación. La configuración del XADC y el estímulo de simulación están registrados, pero las salidas de datos observadas permanecieron en cero y la aplicación efectiva de `design.txt` al modelo aún debe confirmarse. La adquisición analógica, la verificación completa DRP y la prueba física siguen pendientes; por tanto, M1 no está completamente validado. No se modificaron los archivos HDL generados por Vivado.
 
 La integración con M3 se realizará después de verificar individualmente el funcionamiento de M1.
+
+## 14. Actualización posterior — 18 de noviembre de 2026
+
+### 14.1. Prueba física básica
+
+La bitácora técnica posterior registra una prueba con la Nexys 4 DDR y el módulo RTL documentado aquí. Para visualizar la muestra se utilizó el módulo temporal `top_xadc_test`, que invierte `CPU_RESETN` y conecta `pot_sample[11:0]` a los LED de la placa. Al variar físicamente el potenciómetro, se observaron cambios en el patrón de LED.
+
+La evidencia respalda que, en esa prueba:
+
+- VAUXP3/VAUXN3 fue adquirido por el XADC configurado.
+- La lectura DRP llegó a `xadc_interface` y se capturó en `pot_sample`.
+- La muestra digital cambió al variar el potenciómetro.
+
+Esta es una **validación funcional física básica de M1**. No valida todavía el dimmer integral ni caracteriza precisión absoluta, linealidad, error de conversión o el rango completo del XADC.
+
+### 14.2. Implementación de la prueba
+
+La misma bitácora registra, para la implementación usada en esa prueba, los siguientes resultados temporales:
+
+| Indicador | Resultado reportado |
+|---|---:|
+| WNS | +6.093 ns |
+| TNS | 0 ns |
+| WHS | +0.262 ns |
+| THS | 0 ns |
+
+Los resultados corresponden al montaje de prueba M1 con `top_xadc_test` y `xadc_test.xdc`; no constituyen cierre temporal del diseño integral. El top es un recurso de visualización y no reemplaza al futuro `dimmer_top`.
+
+### 14.3. Estado actualizado
+
+| Actividad | Estado al 18 de noviembre de 2026 |
+|---|---|
+| RTL de control, FSM y acceso DRP | Implementado |
+| Observación de la secuencia de control en simulación | Registrada; los casos autochecking del plan siguen pendientes |
+| Adquisición básica del potenciómetro en Nexys 4 DDR | Validada funcionalmente mediante la variación de LED |
+| Caracterización de precisión y linealidad | Pendiente |
+| Integración M1–M3 | Pendiente |
+| Integración completa del dimmer | Pendiente |
+
+Para reproducir el flujo de M1 desde un clon limpio aún debe conservarse o regenerarse la configuración de la IP `xadc_wiz_1` y, para la simulación analógica, el archivo `design.txt`. Los productos generados de Vivado no se sustituyen por el RTL de esta carpeta.

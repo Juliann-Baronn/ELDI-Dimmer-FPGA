@@ -31,3 +31,13 @@
 - El testbench compartido usa reloj de 100 MHz, reset inicial de 100 ns y mantiene `vauxp3`/`vauxn3` en cero; el estímulo revisado para VAUXP[3] (0.50–0.51 V) y VAUXN[3] (0 V) se proporciona mediante `design.txt`, cuya aplicación al modelo IP aún debe confirmarse.
 - En los intervalos mostrados se observó la secuencia `IDLE → REQ → WAIT → REARM → IDLE`, `DEN` durante `REQ`, `capture_sample` con `WAIT` y `DRDY` coincidentes, y un pulso `sample_valid` asociado. `do_out[15:0]`, `pot_sample[11:0]`, `busy_out`, `eoc_out` y `channel_out` se observaron en cero durante esos intervalos.
 - **Estado:** control digital implementado y secuencia de control observada; adquisición analógica útil, valor no nulo en `pot_sample`, efecto de `design.txt`, actividad interna con escala temporal ampliada, verificación completa DRP e integración con el IP real siguen pendientes. La observación de la FSM no demuestra el funcionamiento de la adquisición analógica y M1 no está completamente validado.
+
+## 18 de noviembre de 2026 — Consolidación de avances M1–M5
+
+- **M1 — XADC Interface:** una bitácora posterior registra una prueba básica en Nexys 4 DDR con `top_xadc_test`, donde los LED cambiaron al variar el potenciómetro. Se reportaron WNS = +6.093 ns, TNS = 0 ns, WHS = +0.262 ns y THS = 0 ns para esa implementación de prueba. Esta evidencia valida la adquisición física básica de M1, pero no caracteriza precisión o linealidad ni valida el dimmer completo.
+- **M2 — Zero-Cross Synchronizer:** se registraron 13 comprobaciones unitarias correctas para el sincronizador de dos etapas con reset síncrono.
+- **M3 — Potentiometer-to-Delay Mapper:** se consolidaron los parámetros `D_MIN=10000`, `D_MAX=800000` y el mapeo inverso de 12 a 20 bits. La bitácora registra 15 comprobaciones correctas y síntesis standalone completada; el timing de esta revisión y la integración con M1/M5 continúan pendientes.
+- **M4 — Zero-Cross Event Detector:** se documentó la detección de flanco ascendente armada después de observar nivel bajo. La bitácora registra 16 comprobaciones unitarias correctas.
+- **Integración M2–M4:** se conserva el resultado registrado del 17 de noviembre de 2026: 32 comprobaciones y 0 errores en simulación conductual. Esta entrada no representa una nueva ejecución de la simulación.
+- **M5 — Phase Timer:** existe un testbench en desarrollo, pero el RTL `phase_timer` no está disponible en el repositorio. No se registra como prueba ejecutable ni como módulo validado.
+- **Pendientes principales:** integrar M1–M3, implementar y verificar M5, definir M6–M8 y `dimmer_top`, revisar timing integrado, reproducir la configuración de la IP XADC y validar la cadena de cruce por cero y la etapa de potencia en hardware con aislamiento adecuado.

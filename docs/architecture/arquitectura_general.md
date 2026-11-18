@@ -2,7 +2,8 @@
 
 **Proyecto:** Control de potencia mediante FPGA Digilent Nexys 4 DDR  
 **Documento de referencia:** Arquitectura general del sistema, 27 de octubre de 2026  
-**Estado:** Arquitectura conceptual en proceso de validación.
+**Actualización de estado:** 18 de noviembre de 2026
+**Estado:** Arquitectura en implementación incremental; M1–M4 cuentan con RTL documentado, mientras la integración completa sigue pendiente.
 
 ## 1. Introducción
 
@@ -33,7 +34,7 @@ La arquitectura contiene dos ramas de entrada independientes que convergen en la
 
 ### 4.1. Rama de ajuste
 
-**Flujo:** Potenciómetro → XADC → `xadc_interface` (M1) → `control_mapper` (M3) → `delay_target`.
+**Flujo:** Potenciómetro → XADC → `xadc_interface` (M1) → `pot_to_delay` (M3) → `delay_target`.
 
 Esta rama adquiere el ajuste del usuario mediante el convertidor analógico-digital XADC de la FPGA y transforma la muestra obtenida en un valor de retardo para el control de fase.
 
@@ -97,11 +98,11 @@ La arquitectura define ocho módulos funcionales y un módulo superior de integr
 
 | Identificador | Módulo | Responsabilidad principal |
 |---|---|---|
-| M1 | `xadc_interface` | Obtener muestras digitales del potenciómetro mediante la interfaz DRP del XADC. El control digital está implementado y la secuencia `IDLE`, `REQ`, `WAIT`, `REARM` se observó en simulación; la adquisición analógica sigue pendiente de validar. |
-| M2 | `zero_cross_sync` | Sincronizar la señal externa de cruce por cero con el reloj de la FPGA. |
-| M3 | `control_mapper` | Convertir la muestra del potenciómetro en el valor de retardo `delay_target`. |
-| M4 | `zero_cross_detect` | Detectar el evento de cruce por cero y generar `zc_event`. |
-| M5 | `phase_timer` | Contar los ciclos de reloj correspondientes al retardo y generar `timer_done`. |
+| M1 | `xadc_interface` | Obtener muestras digitales del potenciómetro mediante la interfaz DRP del XADC. El control digital está implementado; una prueba básica en Nexys 4 DDR registró cambios de LED al variar el potenciómetro. La caracterización y la integración con M3 siguen pendientes. |
+| M2 | `zero_cross_sync` | Sincronizar la señal externa de cruce por cero con dos etapas de registros antes de entregarla a M4. |
+| M3 | `pot_to_delay` | Convertir la muestra del potenciómetro en `delay_target[19:0]` mediante un mapeo inverso. |
+| M4 | `zero_cross_detect` | Generar `zc_event` durante un ciclo al detectar un flanco ascendente armado después de observar nivel bajo. |
+| M5 | `phase_timer` | Contar los ciclos de reloj correspondientes al retardo y generar `timer_done`. Su RTL aún no está disponible en este repositorio. |
 | M6 | `dimmer_fsm` | Coordinar la secuencia de detección, temporización y disparo mediante una máquina de estados. |
 | M7 | `triac_pulse` | Generar el pulso digital de disparo con una duración definida. |
 | M8 | Interfaz digital de salida | Llevar la señal `gate_pulse` al puerto físico de salida de la FPGA. |
@@ -119,9 +120,9 @@ Cada módulo tendrá una descripción detallada antes de su implementación. Esa
 
 ### 6.2. Estado de implementación
 
-Los módulos de esta tabla representan la arquitectura definida en el documento de referencia. Su inclusión en la arquitectura no significa que estén implementados ni verificados en Verilog.
+El repositorio contiene RTL para M1, M2, M3 y M4, además de sus testbenches unitarios y una prueba de integración M2–M4. Las bitácoras registran resultados de simulación para M2, M3 y M4; esta arquitectura no sustituye dichas evidencias ni declara una nueva ejecución.
 
-Las interfaces, los parámetros y los comportamientos que el documento identifica como pendientes deberán resolverse antes de considerar definitivo el diseño de cada módulo.
+M5 solo cuenta con un testbench en desarrollo que depende de `phase_timer`, RTL que todavía no se encuentra disponible. M6, M7, M8 y `dimmer_top` continúan como elementos de arquitectura pendientes de implementación e integración. La existencia de un módulo RTL no implica por sí sola validación física o cierre temporal del sistema.
 ## 7. Interfaces principales
 
 Las siguientes señales representan las interfaces funcionales previstas entre los módulos. Las anchuras marcadas como provisionales deberán confirmarse durante el diseño detallado.
@@ -130,7 +131,7 @@ Las siguientes señales representan las interfaces funcionales previstas entre l
 |---|---|---|---|
 | `pot_sample` | M1 → M3 | 12 bits, confirmado | Muestra digital del potenciómetro, obtenida de `DO[15:4]` mediante la interfaz DRP del XADC. |
 | `sample_valid` | M1 → M3 | 1 bit | Indica que hay una muestra disponible. |
-| `delay_target` | M3 → M5 | 20 bits, provisional | Número objetivo de ciclos para la temporización. |
+| `delay_target` | M3 → M5 | 20 bits, confirmado en M3 | Número objetivo de ciclos para la temporización; M5 deberá capturarlo al aceptar el inicio. |
 | `zc_in` | Detector externo → M2 | 1 bit | Señal digital asíncrona de cruce por cero. |
 | `zc_sync` | M2 → M4 | 1 bit | Señal de cruce por cero sincronizada. |
 | `zc_event` | M4 → M6 | 1 bit | Evento detectado de cruce por cero. |
@@ -150,17 +151,17 @@ La arquitectura está definida a nivel conceptual, pero los siguientes puntos de
 
 | Tema | Aspecto pendiente |
 |---|---|
-| XADC | Canal VAUX3, interfaz DRP, dirección `7'h13` y extracción de 12 bits desde `DO[15:4]` identificados en la configuración de Vivado. El control digital de M1 está implementado y su secuencia se observó en simulación; las salidas observadas fueron cero, por lo que la adquisición analógica útil, la verificación completa DRP y la validación física siguen pendientes. |
-| Detector de cruce por cero | Definir el circuito externo, los niveles lógicos, la forma de onda, la polaridad y el aislamiento. |
-| Detección del evento | Determinar qué flancos se detectarán y si es necesario rechazar transiciones espurias. |
-| Mapeo del potenciómetro | Definir los límites de `delay_target`, su resolución y el tratamiento de muestras inválidas. |
+| XADC | M1 implementa VAUX3, DRP, dirección `7'h13` y extracción `DO[15:4]`. Una prueba básica en placa registró una muestra variable al mover el potenciómetro. Siguen pendientes la caracterización de precisión/linealidad, la reproducibilidad de la IP y la integración M1–M3. |
+| Detector de cruce por cero | Definir y validar físicamente el circuito externo, los niveles lógicos, la forma de onda, la polaridad y el aislamiento. |
+| Detección del evento | M4 implementa detección de flanco ascendente armada tras observar bajo. Falta determinar, mediante el circuito físico, si esa polaridad y el rechazo de transiciones espurias son adecuados. |
+| Mapeo del potenciómetro | M3 implementa `D_MIN=10000`, `D_MAX=800000`, 20 bits y mapeo inverso. Falta confirmar el presupuesto temporal integrado y el tratamiento de condiciones que dependan de M5/M6. |
 | Temporizador | Establecer el conteo exacto de ciclos, el comportamiento con retardo cero y las prioridades de inicio y cancelación. |
 | Máquina de estados | Definir las transiciones, las salidas por estado y el comportamiento ante eventos inesperados o simultáneos. |
 | Pulso de disparo | Determinar su duración según la interfaz externa y el TRIAC seleccionados. |
 | Etapa de potencia | Validar la interfaz optoaislada, el TRIAC, la bombilla y las protecciones correspondientes. |
-| Pines y restricciones | Confirmar los pines físicos, el reloj, las polaridades y las restricciones del archivo `.xdc`. |
+| Pines y restricciones | `xadc_test.xdc` y `m3_timing.xdc` corresponden a objetivos distintos; no deben cargarse como un único conjunto sin revisar sus relojes y pines. Falta una restricción integrada para el futuro top. |
 | Reinicio | Confirmar el pin, la polaridad del botón y la compatibilidad con la configuración del XADC. |
-| Verificación | Definir y ejecutar las simulaciones individuales y de integración antes de las pruebas físicas. |
+| Verificación | Hay resultados registrados para M2, M3, M4 y M2–M4, y una prueba física básica de M1. Faltan la integración M1–M3, M3–M5, el sistema completo, timing integrado y las pruebas físicas de la cadena de cruce y potencia. |
 
 ### 8.1. Criterio para cerrar una decisión
 
