@@ -41,3 +41,12 @@
 - **Integración M2–M4:** se conserva el resultado registrado del 17 de noviembre de 2026: 32 comprobaciones y 0 errores en simulación conductual. Esta entrada no representa una nueva ejecución de la simulación.
 - **M5 — Phase Timer:** existe un testbench en desarrollo, pero el RTL `phase_timer` no está disponible en el repositorio. No se registra como prueba ejecutable ni como módulo validado.
 - **Pendientes principales:** integrar M1–M3, implementar y verificar M5, definir M6–M8 y `dimmer_top`, revisar timing integrado, reproducir la configuración de la IP XADC y validar la cadena de cruce por cero y la etapa de potencia en hardware con aislamiento adecuado.
+
+## 23 de noviembre de 2026 — Actualización de integración y cierre documental
+
+- Se incorporaron al conjunto de trabajo los RTL de **M5 `phase_timer`**, **M6 `dimmer_fsm`**, **M7 `triac_pulse`** y el módulo superior integrado **`top_dimmer`**. El top instancia M1–M7 y expone la salida digital `gate_pulse` hacia la interfaz externa M8.
+- Se incorporó la revisión actual de **M3 `pot_to_delay`** junto con los testbenches unitarios de M5, M6 y M7, las pruebas de integración M3–M5 y M4–M7, y el testbench del top integrado. Estos archivos describen pruebas disponibles; esta entrada no registra su ejecución ni les atribuye resultados nuevos.
+- Se incorporaron las restricciones de reloj de M2 y M4, y el XDC de `top_dimmer`, que declara reloj, reset, VAUX3, `zc_in` y `gate_pulse` para el objetivo integrado.
+- Se actualizó la documentación de arquitectura, README y fichas M5–M8 para distinguir implementación existente, pruebas disponibles y resultados efectivamente documentados. M8 se mantiene como interfaz externa de hardware; no se incorpora un módulo RTL ni se documenta una implementación física no respaldada.
+- Se amplió `docs/ai/ai_contributions.md` para registrar el acompañamiento de IA en código, testbenches, depuración, documentación, organización y explicación técnica, manteniendo la responsabilidad de diseño y validación en los integrantes.
+- **Evidencia:** no se ejecutaron simulaciones, síntesis, implementación, análisis temporal ni pruebas físicas como parte de esta actualización documental. No se registran resultados nuevos para M5–M8 ni validación completa del sistema.

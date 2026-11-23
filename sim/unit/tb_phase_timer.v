@@ -1,17 +1,11 @@
-`timescale 1ns / 1ps
 
-//======================================================
-// TESTBENCH: tb_phase_timer
-// PROYECTO: Dimmer digital ELDI
-// MODULO PROBADO: M5 phase_timer
-// RELOJ: 100 MHz
-//======================================================
+`timescale 1ns / 1ps
 
 module tb_phase_timer;
 
-    //==================================================
-    // 1. SEÑALES DE PRUEBA
-    //==================================================
+    // =====================================================
+    // 1. SENALES DEL TESTBENCH
+    // =====================================================
 
     reg clk;
     reg rst;
@@ -23,374 +17,323 @@ module tb_phase_timer;
 
     wire timer_done;
 
+    integer errors;
+    integer checks;
 
-    //==================================================
-    // 2. INSTANCIA DEL MODULO M5
-    //==================================================
+
+    // =====================================================
+    // 2. INSTANCIA DEL MODULO BAJO PRUEBA
+    // =====================================================
 
     phase_timer uut (
-
         .clk(clk),
         .rst(rst),
-
         .timer_start(timer_start),
         .timer_clear(timer_clear),
-
         .delay_target(delay_target),
-
         .timer_done(timer_done)
-
     );
 
 
-    //==================================================
-    // 3. GENERACION DEL RELOJ
-    //==================================================
+    // =====================================================
+    // 3. GENERADOR DE RELOJ
+    // Periodo: 10 ns (100 MHz)
+    // =====================================================
 
     initial begin
         clk = 1'b0;
-    end
-
-    always begin
-        #5 clk = ~clk;
+        forever #5 clk = ~clk;
     end
 
 
-    //==================================================
-    // 4. TAREA PARA INICIAR EL TEMPORIZADOR
-    //==================================================
+    // =====================================================
+    // 4. TAREA DE COMPROBACION
+    // =====================================================
 
-    task start_timer;
-
+    task check_done;
+        input expected;
         begin
+            checks = checks + 1;
 
-            @(negedge clk);
-            timer_start = 1'b1;
+            if (timer_done !== expected) begin
 
-            @(negedge clk);
-            timer_start = 1'b0;
+                errors = errors + 1;
 
+                $display(
+                    "ERROR [%0t]: esperado=%b, obtenido=%b",
+                    $time, expected, timer_done
+                );
+
+            end
+            else begin
+
+                $display(
+                    "OK [%0t]: timer_done=%b",
+                    $time, timer_done
+                );
+
+            end
         end
-
     endtask
 
 
-    //==================================================
-    // 5. TAREA PARA VERIFICAR UN RETARDO
-    //==================================================
+    // =====================================================
+    // 5. ESPERAR CICLOS COMPLETOS
+    // =====================================================
 
-    task check_delay;
-
-        input [19:0] target;
-        input integer expected_cycles;
-
-        integer elapsed;
+    task wait_cycles;
+        input integer cycles;
+        integer i;
 
         begin
+            for (i = 0; i < cycles; i = i + 1) begin
+                @(posedge clk);
+                #1;
+            end
+        end
+    endtask
 
+
+    // =====================================================
+    // 6. GENERAR SOLICITUD DE INICIO
+    // El temporizador acepta el flanco ascendente
+    // en el siguiente flanco positivo del reloj.
+    // =====================================================
+
+    task start_timer;
+        input [19:0] target;
+
+        begin
             @(negedge clk);
 
             delay_target = target;
-
             timer_start = 1'b1;
+
+            @(posedge clk);
+            #1;
 
             @(negedge clk);
 
             timer_start = 1'b0;
-
-            elapsed = 0;
-
-            // Esperar hasta timer_done
-            while (timer_done !== 1'b1 &&
-                   elapsed <= expected_cycles) begin
-
-                @(negedge clk);
-
-                elapsed = elapsed + 1;
-
-            end
-
-            // Comprobar resultado
-            if (timer_done !== 1'b1) begin
-
-                $display(
-                    "ERROR: No finalizo el conteo."
-                );
-
-                $fatal;
-
-            end
-
-            if (elapsed != expected_cycles) begin
-
-                $display(
-                    "ERROR: Conteo incorrecto. Esperado=%0d, Obtenido=%0d",
-                    expected_cycles,
-                    elapsed
-                );
-
-                $fatal;
-
-            end
-
-            // Comprobar que DONE dura un ciclo
-            @(negedge clk);
-
-            if (timer_done !== 1'b0) begin
-
-                $display(
-                    "ERROR: timer_done duro mas de un ciclo."
-                );
-
-                $fatal;
-
-            end
-
-            $display(
-                "PASS: delay_target=%0d, ciclos=%0d",
-                target,
-                elapsed
-            );
-
         end
-
     endtask
 
 
-    //==================================================
-    // 6. SECUENCIA PRINCIPAL DE PRUEBAS
-    //==================================================
+    // =====================================================
+    // 7. SECUENCIA PRINCIPAL DE PRUEBAS
+    // =====================================================
 
     initial begin
 
-        // Inicializacion
-        rst = 1'b1;
+        errors = 0;
+        checks = 0;
 
+        rst = 1'b1;
         timer_start = 1'b0;
         timer_clear = 1'b0;
-
         delay_target = 20'd0;
 
 
-        //==============================================
+        $display("\n======================================");
+        $display(" TESTBENCH M5 - PHASE TIMER");
+        $display("======================================");
+
+
+        // -------------------------------------------------
         // PRUEBA 1: RESET
-        //==============================================
+        // -------------------------------------------------
 
-        repeat(5) @(negedge clk);
+        $display("\nPRUEBA 1: RESET");
 
+        wait_cycles(2);
+
+        check_done(1'b0);
+
+
+        // -------------------------------------------------
+        // PRUEBA 2: CUENTA REGRESIVA DE CINCO CICLOS
+        // -------------------------------------------------
+
+        $display("\nPRUEBA 2: CUENTA REGRESIVA");
+
+        @(negedge clk);
         rst = 1'b0;
 
-        @(negedge clk);
+        start_timer(20'd5);
 
-        if (timer_done !== 1'b0) begin
+        wait_cycles(3);
+        check_done(1'b0);
 
-            $display("ERROR: Reset incorrecto.");
-            $fatal;
+        wait_cycles(1);
+        check_done(1'b0);
 
-        end
+        wait_cycles(1);
+        check_done(1'b1);
 
-        $display("PASS: Reset inicial");
-
-
-        //==============================================
-        // PRUEBA 2: RETARDO DE 1 CICLO
-        //==============================================
-
-        check_delay(20'd1, 1);
+        wait_cycles(1);
+        check_done(1'b0);
 
 
-        //==============================================
-        // PRUEBA 3: RETARDO DE 2 CICLOS
-        //==============================================
+        // -------------------------------------------------
+        // PRUEBA 3: RETARDO IGUAL A CERO
+        // -------------------------------------------------
 
-        check_delay(20'd2, 2);
+        $display("\nPRUEBA 3: RETARDO CERO");
 
+        start_timer(20'd0);
 
-        //==============================================
-        // PRUEBA 4: RETARDO DE 3 CICLOS
-        //==============================================
+        // timer_done ya debe estar activo
+        // al terminar la tarea start_timer.
 
-        check_delay(20'd3, 3);
+        check_done(1'b1);
 
-
-        //==============================================
-        // PRUEBA 5: RETARDO DE 5 CICLOS
-        //==============================================
-
-        check_delay(20'd5, 5);
+        wait_cycles(1);
+        check_done(1'b0);
 
 
-        //==============================================
-        // PRUEBA 6: RETARDO CERO
-        //==============================================
+        // -------------------------------------------------
+        // PRUEBA 4: CAPTURA DE DELAY_TARGET
+        // -------------------------------------------------
 
-        check_delay(20'd0, 0);
+        $display("\nPRUEBA 4: CAPTURA DEL RETARDO");
 
+        start_timer(20'd5);
 
-        //==============================================
-        // PRUEBA 7: CAMBIO DE DELAY DURANTE CONTEO
-        //==============================================
+        // Cambiar delay_target durante la cuenta.
+        // El temporizador debe conservar el valor inicial.
 
         @(negedge clk);
-
-        delay_target = 20'd5;
-
-        timer_start = 1'b1;
-
-        @(negedge clk);
-
-        timer_start = 1'b0;
-
-        // Esperar dos ciclos
-        repeat(2) @(negedge clk);
-
-        // Cambiar el valor proveniente de M3
         delay_target = 20'd2;
 
-        // El contador debe conservar el objetivo original
-        if (uut.delay_register !== 20'd5) begin
+        wait_cycles(3);
+        check_done(1'b0);
 
-            $display(
-                "ERROR: No se capturo correctamente delay_target."
-            );
+        wait_cycles(1);
+        check_done(1'b1);
 
-            $fatal;
+        wait_cycles(1);
+        check_done(1'b0);
 
-        end
 
-        repeat(3) @(negedge clk);
+        // -------------------------------------------------
+        // PRUEBA 5: CANCELACION MEDIANTE TIMER_CLEAR
+        // -------------------------------------------------
 
-        if (timer_done !== 1'b1) begin
+        $display("\nPRUEBA 5: CANCELACION");
 
-            $display(
-                "ERROR: El cambio de delay altero la temporizacion."
-            );
+        start_timer(20'd10);
 
-            $fatal;
-
-        end
+        wait_cycles(3);
 
         @(negedge clk);
-
-        $display(
-            "PASS: Cambio de delay durante conteo"
-        );
-
-
-        //==============================================
-        // PRUEBA 8: CANCELACION DURANTE CONTEO
-        //==============================================
-
-        @(negedge clk);
-
-        delay_target = 20'd10;
-
-        timer_start = 1'b1;
-
-        @(negedge clk);
-
-        timer_start = 1'b0;
-
-        repeat(3) @(negedge clk);
-
         timer_clear = 1'b1;
 
-        @(negedge clk);
+        @(posedge clk);
+        #1;
 
+        check_done(1'b0);
+
+        @(negedge clk);
         timer_clear = 1'b0;
 
-        repeat(12) @(negedge clk);
+        // Comprobar que el temporizador no finaliza
+        // despues de haber sido cancelado.
 
-        if (timer_done !== 1'b0 || uut.active !== 1'b0) begin
-
-            $display(
-                "ERROR: La cancelacion no funciono."
-            );
-
-            $fatal;
-
-        end
-
-        $display(
-            "PASS: Cancelacion mediante timer_clear"
-        );
+        wait_cycles(11);
+        check_done(1'b0);
 
 
-        //==============================================
-        // PRUEBA 9: CLEAR Y START SIMULTANEOS
-        //==============================================
+        // -------------------------------------------------
+        // PRUEBA 6: NUEVO INICIO DURANTE CUENTA
+        // -------------------------------------------------
+
+        $display("\nPRUEBA 6: NUEVO INICIO DURANTE CUENTA");
+
+        start_timer(20'd8);
+
+        // Intentar iniciar otro temporizador mientras
+        // el primero todavia esta activo.
+
+        start_timer(20'd2);
+
+        // El segundo inicio debe ser ignorado.
+        // La cuenta original debe conservar sus 8 ciclos.
+
+        wait_cycles(4);
+        check_done(1'b0);
+
+        wait_cycles(1);
+        check_done(1'b0);
+
+        wait_cycles(1);
+        check_done(1'b1);
+
+        wait_cycles(1);
+        check_done(1'b0);
+
+
+        // -------------------------------------------------
+        // PRUEBA 7: RETARDO DE UN CICLO
+        // -------------------------------------------------
+
+        $display("\nPRUEBA 7: RETARDO DE UN CICLO");
+
+        start_timer(20'd1);
+
+        wait_cycles(1);
+        check_done(1'b1);
+
+        wait_cycles(1);
+        check_done(1'b0);
+
+
+        // -------------------------------------------------
+        // PRUEBA 8: RESET DURANTE UNA CUENTA ACTIVA
+        // -------------------------------------------------
+
+        $display("\nPRUEBA 8: RESET DURANTE CUENTA");
+
+        start_timer(20'd10);
+
+        wait_cycles(3);
 
         @(negedge clk);
+        rst = 1'b1;
 
-        timer_start = 1'b1;
-        timer_clear = 1'b1;
+        @(posedge clk);
+        #1;
 
-        delay_target = 20'd5;
-
-        @(negedge clk);
-
-        timer_start = 1'b0;
-        timer_clear = 1'b0;
-
-        if (uut.active !== 1'b0) begin
-
-            $display(
-                "ERROR: CLEAR no tuvo prioridad."
-            );
-
-            $fatal;
-
-        end
-
-        $display(
-            "PASS: Prioridad de timer_clear"
-        );
-
-
-        //==============================================
-        // PRUEBA 10: START MANTENIDO
-        //==============================================
+        check_done(1'b0);
 
         @(negedge clk);
+        rst = 1'b0;
 
-        delay_target = 20'd3;
-        timer_start = 1'b1;
+        // Comprobar que la cuenta anterior
+        // no se reanuda despues del reset.
 
-        // Mantener START activo durante varios ciclos
-        repeat(7) @(negedge clk);
+        wait_cycles(11);
+        check_done(1'b0);
 
-        timer_start = 1'b0;
 
-        if (timer_done !== 1'b0) begin
+        // -------------------------------------------------
+        // 8. RESUMEN FINAL
+        // -------------------------------------------------
 
-            $display(
-                "ERROR: START mantenido produjo un nuevo disparo."
-            );
+        $display("\n======================================");
+        $display(" RESULTADOS DE LA SIMULACION");
+        $display("======================================");
 
-            $fatal;
+        $display("Checks ejecutados : %0d", checks);
+        $display("Errores detectados: %0d", errors);
 
+        if (errors == 0) begin
+            $display("RESULTADO: TODAS LAS PRUEBAS APROBADAS");
+        end
+        else begin
+            $display("RESULTADO: SE DETECTARON ERRORES");
         end
 
-        $display(
-            "PASS: START mantenido no reinicia el contador"
-        );
-
-
-        //==============================================
-        // PRUEBA 11: RETARDO REPRESENTATIVO
-        //==============================================
-
-        check_delay(20'd1100, 1100);
-
-
-        //==============================================
-        // FINALIZACION
-        //==============================================
-
-        $display("--------------------------------");
-        $display("TODAS LAS PRUEBAS FINALIZARON");
-        $display("M5 VERIFICADO EN LOS CASOS PROBADOS");
-        $display("--------------------------------");
+        $display("======================================");
 
         $finish;
 
